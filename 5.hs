@@ -1,16 +1,17 @@
-import Text.ParserCombinators.Parsec
+import Text.Parsec
 import Data.Functor
 import Control.Monad
 import Data.List
 import Data.Maybe
 import Data.Either
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as B
 
 data Move = Move Int Int Int
-    deriving Show
 
 type Stacks = [[Char]]
 
-inputFile :: GenParser Char st (Stacks, [Move])
+inputFile :: Parsec ByteString st (Stacks, [Move])
 inputFile = liftM2 (,) stacks moves <* eof
     where
         stacks = do
@@ -22,12 +23,9 @@ inputFile = liftM2 (,) stacks moves <* eof
         block = char '[' *> upper <* char ']'
         moves = move `endBy` eol
         move = do
-            string "move "
-            n <- number
-            string " from "
-            from <- number
-            string " to "
-            to <- number
+            string "move "; n <- number
+            string " from "; from <- number
+            string " to "; to <- number
             return $ Move n from to
         number = read <$> many digit
         eol = char '\n'
@@ -40,11 +38,11 @@ mapSnd f (a, b) = (a, f b)
 
 lift :: Int -> Int -> Stacks -> ([Char], Stacks)
 lift n 1 (s : ss) = mapSnd (: ss) $ splitAt n s
-lift n i (s : ss) = mapSnd (s :) $ lift n (i-1) ss
+lift n i (s : ss) = mapSnd (s :) $ lift n (i - 1) ss
 
 place :: Int -> [Char] -> Stacks -> Stacks
 place 1 cs (s : ss) = (cs ++ s) : ss
-place n cs (s : ss) = s : place (n-1) cs ss
+place i cs (s : ss) = s : place (i - 1) cs ss
 
 moveSerial :: Stacks -> Move -> Stacks
 moveSerial ss (Move n from to) = uncurry (place to) $ mapFst reverse $ lift n from ss
@@ -52,8 +50,9 @@ moveSerial ss (Move n from to) = uncurry (place to) $ mapFst reverse $ lift n fr
 moveSimul :: Stacks -> Move -> Stacks
 moveSimul ss (Move n from to) = uncurry (place to) $ lift n from ss
 
+main :: IO ()
 main = do
-    rawInput <- readFile "input5.txt"
+    rawInput <- B.readFile "input5.txt"
     let input = fromRight (error "parse error") $ parse inputFile "" rawInput
-    sequence $ [moveSerial, moveSimul] <&> (\move -> 
-        putStrLn $ map head $ uncurry (foldl' move) input) 
+    void $ sequence $ [moveSerial, moveSimul] <&> (\move -> 
+        putStrLn $ map head $ uncurry (foldl' move) input)
